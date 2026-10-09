@@ -1,0 +1,25 @@
+'use client'
+
+import Link from 'next/link'
+import { motion } from 'motion/react'
+import UserAvatar from '@/components/user-avatar'
+import SettlementDialog from '@/components/settlement-dialog'
+import BalanceNumber from '@/components/balance-number'
+import { balanceExplanation,signedUnits,type BalanceCard,type BalanceFilters,type BalanceTotals } from '@/lib/settlement-types'
+
+function href(filters:BalanceFilters,update:Partial<BalanceFilters>) {
+  const next={...filters,...update};const params=new URLSearchParams()
+  Object.entries(next).forEach(([key,value])=>{if(value&&!(key==='page'&&value===1)&&!(key==='tab'&&value==='all'))params.set(key,String(value))})
+  return `/dashboard/balances?${params}`
+}
+export default function BalancesView({filters,result,summary,invalid}:{filters:BalanceFilters;result:{count:number;rows:BalanceCard[]};summary:BalanceTotals;invalid:boolean}) {
+  return <div className="page-content circle-page"><div className="hero-row"><div><div className="eyebrow">YOUR GLOBAL LEDGER</div><h1>Balances</h1><p>Know exactly where you stand with your circle.</p></div><Link className="button outline" href="/dashboard/settlements">Settlement requests {summary.incomingSettlements>0&&<span className="circle-badge">{summary.incomingSettlements}</span>}</Link></div>
+    <motion.section className="stats-grid ledger-summary-grid" aria-label="Global balances" initial={{opacity:0}} animate={{opacity:1}}>{[['Friends who owe you',summary.owesMeCount,'positive'],['Friends you owe',summary.iOweCount,'negative'],['Proxies owed to you',summary.owedToMe,'positive'],['Proxies you owe',summary.iOwe,'negative'],['Fully settled relationships',summary.settledCount,'']].map(([label,value,tone])=><article className="stat-card" key={label}><span>{label}</span><BalanceNumber value={Number(value)} tone={String(tone)}/><small>Across all subjects</small></article>)}</motion.section>
+    {invalid&&<p className="circle-feedback" role="alert">Invalid filters. Showing your current balances.</p>}
+    <nav className="circle-tabs" aria-label="Balance filters">{([['all','All'],['owes-me','Owes me'],['i-owe','I owe'],['settled','Settled']]as const).map(([tab,label])=><Link key={tab} className={filters.tab===tab?'selected':''} aria-current={filters.tab===tab?'page':undefined} href={href(filters,{tab,page:1})}>{label}</Link>)}</nav>
+    <form className="panel ledger-filter-form" action="/dashboard/balances"><input type="hidden" name="tab" value={filters.tab}/><label>Search relationships<input className="favor-input" type="search" name="q" maxLength={80} defaultValue={filters.q} placeholder="Friend name"/></label><label>Sort<select className="favor-input" name="sort" defaultValue={filters.sort}><option value="owed">Highest owed to me</option><option value="owe">Highest I owe</option><option value="name">Alphabetical</option><option value="recent">Recently active</option></select></label><button className="button primary" type="submit">Apply</button></form>
+    <p className="circle-muted">{result.count} relationships · {summary.outstandingCount} outstanding · {summary.pendingSettlements} pending settlement requests. Pending requests change no balances.</p>
+    <motion.section className="circle-grid" key={JSON.stringify(filters)} initial={{opacity:0}} animate={{opacity:1}} aria-label="Balances">{result.rows.map((row,index)=><motion.article className="panel ledger-balance-card" key={row.person.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:Math.min(index,5)*.03}}><div className="circle-card-header"><UserAvatar user={{...row.person,email:null}}/><div><h2>{row.person.name||'Your friend'}</h2><span className="circle-muted">{row.connected?'Connected':'Shared history · Former connection'}</span></div><span className={`ledger-units ${row.balance>0?'positive':row.balance<0?'negative':''}`}>{signedUnits(row.balance)}</span></div><p>{balanceExplanation(row.balance,row.person.name)}</p><span className="circle-badge">{row.balance===0?'Settled':row.balance>0?'Owes you':'You owe'}</span><p className="circle-muted">{row.favors} confirmed favors · {row.pendingSettlements} pending settlements</p><div className="circle-card-actions"><Link className="button outline" href={`/dashboard/balances/${row.person.id}`}>View ledger</Link><SettlementDialog relationship={row}/></div></motion.article>)}{!result.rows.length&&<motion.div className="panel circle-empty" initial={{opacity:0}} animate={{opacity:1}}><h2>{filters.tab==='settled'?'No settled relationships here':filters.q?'No matching relationships':'Nothing outstanding here'}</h2><p>Confirmed attendance favors create your shared balance. Try another filter or record a favor.</p><Link className="button outline" href="/dashboard/transactions">Go to Transactions</Link></motion.div>}</motion.section>
+    <nav className="circle-pagination" aria-label="Balance pages">{filters.page>1&&<Link className="button outline" href={href(filters,{page:filters.page-1})}>Previous</Link>}{result.count>filters.page*20&&<Link className="button outline" href={href(filters,{page:filters.page+1})}>Next</Link>}</nav>
+  </div>
+}

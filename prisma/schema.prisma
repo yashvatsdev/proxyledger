@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum FavorStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  REVERSED
+  CANCELED
+}
+
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELED
+}
+
+enum NotificationType {
+  FRIENDSHIP_REQUEST
+  FRIEND_REQUEST_RECEIVED
+  FRIEND_REQUEST_ACCEPTED
+  FRIEND_REQUEST_REJECTED
+  FAVOR_REQUEST
+  FAVOR_REQUEST_RECEIVED
+  FAVOR_CONFIRMED
+  FAVOR_REJECTED
+  FAVOR_CANCELED
+  SETTLEMENT_REQUEST
+  SETTLEMENT_REQUEST_RECEIVED
+  SETTLEMENT_CONFIRMED
+  SETTLEMENT_REJECTED
+  SETTLEMENT_CANCELED
+}
+
+model User {
+  id                   String         @id @default(cuid())
+  name                 String?
+  email                String?        @unique
+  emailVerified        DateTime?      @db.Timestamptz(3)
+  image                String?
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
+  accounts             Account[]
+  sessions             Session[]
+  friendshipsRequested Friendship[]   @relation("FriendshipRequester")
+  friendshipsReceived  Friendship[]   @relation("FriendshipRecipient")
+  subjects             Subject[]
+  favorsProvided       Favor[]        @relation("FavorProvider")
+  favorsReceived       Favor[]        @relation("FavorBeneficiary")
+  favorsCreated        Favor[]        @relation("FavorCreator")
+  settlementsRequested Settlement[]   @relation("SettlementRequester")
+  settlementsReceived  Settlement[]   @relation("SettlementRecipient")
+  notifications        Notification[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime @db.Timestamptz(3)
+
+  @@unique([identifier, token])
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  recipientId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+  connectedAt DateTime?        @db.Timestamptz(3)
+  notifications Notification[]
+  requester   User             @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  recipient   User             @relation("FriendshipRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+
+  // Unordered pair uniqueness is enforced by a LEAST/GREATEST expression index in SQL.
+  @@index([requesterId, status])
+  @@index([recipientId, status])
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?
+  ownerId   String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  favors    Favor[]
+
+  @@unique([ownerId, name])
+  @@unique([ownerId, code])
+}
+
+model Favor {
+  id            String      @id @default(cuid())
+  providerId    String
+  beneficiaryId String
+  createdById   String
+  subjectId     String?
+  occurredAt    DateTime    @db.Timestamptz(3)
+  note          String?     @db.Text
+  status        FavorStatus @default(PENDING)
+  confirmedAt   DateTime?   @db.Timestamptz(3)
+  resolvedAt    DateTime?   @db.Timestamptz(3)
+  submissionKey String?
+  notifications Notification[]
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(3)
+  provider      User        @relation("FavorProvider", fields: [providerId], references: [id], onDelete: Restrict)
+  beneficiary   User        @relation("FavorBeneficiary", fields: [beneficiaryId], references: [id], onDelete: Restrict)
+  createdBy     User        @relation("FavorCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  subject       Subject?    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@index([providerId, status, occurredAt])
+  @@index([beneficiaryId, status, occurredAt])
+  @@index([createdById])
+  @@index([subjectId])
+  @@unique([createdById, submissionKey])
+  @@index([providerId, status, confirmedAt])
+  @@index([beneficiaryId, status, confirmedAt])
+}
+
+model Settlement {
+  id           String           @id @default(cuid())
+  requesterId  String
+  recipientId  String
+  // Signed adjustment to requester's balance against recipient; recipient gets the inverse.
+  signedAmount Int
+  reason       String?          @db.Text
+  status       SettlementStatus @default(PENDING)
+  confirmedAt  DateTime?        @db.Timestamptz(3)
+  resolvedAt   DateTime?        @db.Timestamptz(3)
+  submissionKey String?
+  notifications Notification[]
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  requester    User             @relation("SettlementRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  recipient    User             @relation("SettlementRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@index([requesterId, status, createdAt])
+  @@index([recipientId, status, createdAt])
+  @@index([requesterId, status, confirmedAt])
+  @@index([recipientId, status, confirmedAt])
+  @@unique([requesterId, submissionKey])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  readAt    DateTime?        @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  friendshipId String?
+  friendship Friendship? @relation(fields: [friendshipId], references: [id], onDelete: SetNull)
+  favorId String?
+  favor Favor? @relation(fields: [favorId], references: [id], onDelete: SetNull)
+  settlementId String?
+  settlement Settlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([friendshipId])
+  @@index([favorId])
+  @@index([settlementId])
+}
+
+// One rolling bucket per actor/scope, shared across application instances.
+model RateLimitBucket {
+  key String @id
+  count Int
+  expiresAt DateTime @db.Timestamptz(3)
+}

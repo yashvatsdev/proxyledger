@@ -9,8 +9,22 @@ __v0_jsx-dev-runtime.ts
 
 # Environment variables
 .env*.local
+.env
+.env.*
+!.env.example
+generated/
+*.tsbuildinfo
+.pnpm-store/
+coverage/
+.phase4-baseline.json
+.phase4-before.prisma
+.phase5-before.prisma
+.phase5-baseline.json
 
 # Common ignores
 node_modules
+node_modules.phase1-backup/
 .next/
+next-env.d.ts
 .DS_Store
+.env

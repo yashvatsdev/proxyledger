@@ -1,5 +1,11 @@
 pmOnFail: ignore
 
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  esbuild: true
+  unrs-resolver: true
+
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
