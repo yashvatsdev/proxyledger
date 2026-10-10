@@ -1,6 +1,10 @@
 import 'server-only'
 import { X509Certificate } from 'node:crypto'
 
+// Match the driver's bounded pool wait. Prisma's 2s default expires while
+// ordinary reads are queued on a shared serverless connection.
+export const databaseTransactionOptions = { maxWait: 10_000 } as const
+
 export function databasePoolConfig(connectionString: string, serverless = process.env.VERCEL === '1', certificate = process.env.DATABASE_SSL_CA) {
   const url = new URL(connectionString)
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)

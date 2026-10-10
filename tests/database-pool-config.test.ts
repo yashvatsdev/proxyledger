@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { databasePoolConfig } from '../lib/database-pool-config'
+import { databasePoolConfig, databaseTransactionOptions } from '../lib/database-pool-config'
 import { rootCertificates } from 'node:tls'
 import { Client } from 'pg'
 
 describe('runtime PostgreSQL pool policy', () => {
+  it('allows bounded transaction acquisition without changing execution or isolation defaults', () => {
+    expect(databaseTransactionOptions).toEqual({ maxWait: 10000 })
+    expect(databaseTransactionOptions.maxWait).toBe(databasePoolConfig('postgresql://test:test@localhost/postgres', true).connectionTimeoutMillis)
+  })
   it('preserves an explicit CA through the actual pg connection-string parser', () => {
     const ca = rootCertificates[0]
     const config = databasePoolConfig('postgresql://test:test@pool.example.invalid:6543/postgres?sslmode=require', true, ca)

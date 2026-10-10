@@ -8,7 +8,11 @@ import { getPrisma } from '@/lib/db'
 
 export default async function DashboardPage() {
   const user = await requireUser()
-  const [summary, favors, ledger] = await Promise.all([getCircleSummary(user.id), getFavorSummary(user.id), getLedgerOverview(user.id)])
+  // Avoid adding ledger transactions to the circle/favor query fan-out on
+  // the single connection shared by concurrent serverless invocations.
+  const summary = await getCircleSummary(user.id)
+  const favors = await getFavorSummary(user.id)
+  const ledger = await getLedgerOverview(user.id)
   const circleRows = await createLedgerService(getPrisma()).balancesFor(user.id,summary.preview.map(row=>row.person.id))
   const circleBalances = Object.fromEntries(circleRows.map(row=>[row.person.id,row.balance]))
   const publicSummary = { ...summary, preview: summary.preview.map(row => ({ ...row, person: { ...row.person, email: null } })) }

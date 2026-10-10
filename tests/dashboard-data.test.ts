@@ -10,6 +10,22 @@ vi.mock('../app/dashboard/dashboard-client', () => ({ default: () => null }))
 import DashboardPage from '../app/dashboard/page'
 
 beforeEach(() => vi.resetAllMocks())
+it('finishes summary reads before starting ledger transactions on the shared pool', async () => {
+  mocks.requireUser.mockResolvedValue({ id: 'actor' })
+  let release!: (value: unknown) => void
+  const circle = new Promise(resolve => { release = resolve })
+  mocks.circle.mockReturnValue(circle)
+  mocks.favors.mockResolvedValue({})
+  mocks.overview.mockResolvedValue({})
+  mocks.balancesFor.mockResolvedValue([])
+  const page = DashboardPage()
+  await vi.waitFor(() => expect(mocks.circle).toHaveBeenCalled())
+  expect(mocks.favors).not.toHaveBeenCalled()
+  expect(mocks.overview).not.toHaveBeenCalled()
+  release({ preview: [] })
+  await page
+  expect(mocks.favors.mock.invocationCallOrder[0]).toBeLessThan(mocks.overview.mock.invocationCallOrder[0])
+})
 it('connects session-scoped summaries and balances while omitting friends’ private email', async () => {
   mocks.requireUser.mockResolvedValue({ id: 'actor', name: 'Owner', email: 'owner@example.invalid' })
   mocks.circle.mockResolvedValue({ accepted: 1, incoming: 2, unread: 3, preview: [{ id: 'connection', person: { id: 'friend', name: 'Friend', email: 'private@example.invalid' } }] })

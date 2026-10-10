@@ -93,7 +93,11 @@ export function createLedgerService(db: PrismaClient) {
     return { count: integer(counts[0].count), rows: rows.map(row=>eventDto(actor,row)) }
   }
   async function overview(actor: string) {
-    const [summary, preview, recent] = await Promise.all([totals(actor), list(actor,{ sort:'recent' }), entries(actor)])
+    // These reads share a single serverless connection. Do not queue two
+    // snapshot transactions behind the totals query within the same request.
+    const summary = await totals(actor)
+    const preview = await list(actor,{ sort:'recent' })
+    const recent = await entries(actor)
     return { summary, preview: preview.rows.slice(0,4), recent: recent.rows.slice(0,5) }
   }
   return { pair, balancesFor, list, totals, entries, overview }
