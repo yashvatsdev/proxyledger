@@ -3,6 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ session: vi.fn(), requireUser: vi.fn(), redirect: vi.fn() }))
 vi.mock('../lib/auth-session', () => ({ getSession: mocks.session, requireUser: mocks.requireUser }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
+// next/font is compiled by Next.js; authorization tests run without its loader.
+vi.mock('next/font/google', () => ({ Geist: () => ({ variable: 'dashboard-font-test' }) }))
 vi.mock('../app/login/login-card', () => ({ default: () => null }))
 vi.mock('../app/dashboard/dashboard-client', () => ({ default: () => null }))
 vi.mock('../app/dashboard/friends/friends-view', () => ({ default: () => null }))

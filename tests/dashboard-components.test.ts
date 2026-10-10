@@ -20,6 +20,7 @@ it('renders supported account information and real destinations without fake sav
 it('provides profile initials with a readable avatar name', () => {
   const html = renderToStaticMarkup(createElement(UserAvatar, { user: { name: 'Avery User', email: null, image: null } }))
   expect(html).toContain('aria-label="Avery User"')
+  expect(html).toContain('role="img"')
   expect(html).toContain('AU')
 })
 it('labels the search trigger and announces loading without displaying placeholder metrics', () => {

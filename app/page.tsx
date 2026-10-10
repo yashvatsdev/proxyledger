@@ -1,13 +1,13 @@
 'use client'
 
 import { useRef, useState, type MouseEvent } from 'react'
-import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
+import { motion, MotionConfig, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { useGSAP } from '@gsap/react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowRight, CircleAlert, Clock3, Menu, Minus, Plus, Sparkles, Users, X } from 'lucide-react'
 import { AnimatedButton } from '@/components/animations'
-import { createMagneticEffect, easeOut, prefersReducedMotion } from '@/lib/animations'
+import { easeOut, prefersReducedMotion } from '@/lib/animations'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -43,13 +43,31 @@ export default function LandingPage() {
 
   useGSAP(() => {
     if (prefersReducedMotion()) return
+    const introElements = pageRef.current?.querySelectorAll<HTMLElement>('.landing-nav, .eyebrow-badge, .hero-content h1, .hero-content > p, .hero-actions, .preview-frame')
+    let intro: gsap.core.Timeline | undefined
+    // A stalled timeline must never strand navigation or CTAs at opacity zero.
+    const finishIntro = () => {
+      if (intro && intro.progress() < 1) intro.progress(1)
+      introElements?.forEach(element => {
+        element.style.removeProperty('opacity')
+        element.style.removeProperty('transform')
+      })
+    }
+    const recovery = window.setTimeout(finishIntro, 4000)
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) finishIntro() }
+    window.addEventListener('pageshow', restore)
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const updateMotion = () => { if (motionQuery.matches) { context.revert(); finishIntro() } }
+    motionQuery.addEventListener('change', updateMotion)
     const context = gsap.context(() => {
-      const intro = gsap.timeline({ defaults: { ease: easeOut } })
+      // CSS supplies a finite no-JS fallback; GSAP owns the hydrated sequence.
+      gsap.set('.hero-actions', { animation: 'none' })
+      intro = gsap.timeline({ defaults: { ease: easeOut }, onComplete: () => { window.clearTimeout(recovery); finishIntro() } })
       intro.from('.landing-nav', { opacity: 0, y: -18, duration: 0.55 })
         .from('.eyebrow-badge', { opacity: 0, y: 18, duration: 0.45 }, '-=0.2')
         .from('.hero-content h1', { opacity: 0, y: 32, duration: 0.7 }, '-=0.16')
         .from('.hero-content > p', { opacity: 0, y: 18, duration: 0.5 }, '-=0.35')
-        .from('.hero-actions', { y: 8, duration: 0.5, immediateRender: false, clearProps: 'transform' }, '-=0.22')
+        .fromTo('.hero-actions', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5 }, '-=0.12')
         .from('.preview-frame', { opacity: 0, y: 70, scale: 0.94, rotateX: 5, duration: 0.85 }, '-=0.08')
       gsap.utils.toArray<HTMLElement>('.gsap-reveal').forEach((element) => {
         gsap.from(element, { opacity: 0, y: 28, duration: 0.65, ease: easeOut, scrollTrigger: { trigger: element, start: 'top 84%', once: true } })
@@ -57,13 +75,14 @@ export default function LandingPage() {
       gsap.from('.network-backdrop path', { strokeDasharray: 1200, strokeDashoffset: 1200, duration: 1.6, stagger: 0.18, ease: 'power2.out' })
       gsap.to('.network-backdrop', { y: -45, scrollTrigger: { trigger: '.landing-hero', start: 'top top', end: 'bottom top', scrub: 1 } })
     }, pageRef)
-    return () => context.revert()
+    return () => {
+      window.clearTimeout(recovery)
+      window.removeEventListener('pageshow', restore)
+      motionQuery.removeEventListener('change', updateMotion)
+      context.revert()
+    }
   }, { scope: pageRef })
 
-  useGSAP(() => {
-    const cta = document.querySelector<HTMLElement>('.hero-actions .primary')
-    return cta ? createMagneticEffect(cta) : undefined
-  }, { scope: pageRef })
   const navOpacity = useTransform(scrollY, [0, 80], [0, 1])
 
   const updateBalance = (delta: number) => setBalance((current) => current + delta)
@@ -79,7 +98,7 @@ export default function LandingPage() {
   }
 
   return (
-    <main ref={pageRef} className="landing-shell">
+    <MotionConfig reducedMotion="user"><main ref={pageRef} className="landing-shell">
       <motion.header className="landing-nav" style={{ backgroundColor: `rgba(10, 13, 17, ${navOpacity})` }}>
         <a className="landing-brand" href="#top" aria-label="Proxy Ledger home"><span className="brand-mark"><ArrowRight /></span><strong>proxyledger</strong></a>
         <nav className="desktop-links" aria-label="Main navigation">
@@ -115,7 +134,7 @@ export default function LandingPage() {
 
       <section className="final-cta" id="faq"><div className="ambient-glow" /><span className="section-kicker">YOUR CIRCLE IS WAITING</span><h2>Keep the favors.<br /><em>Lose the confusion.</em></h2><p>Your circle deserves a better way to keep track.</p><a className="button primary large" href="/dashboard">Get started for free <ArrowRight /></a></section>
       <footer className="landing-footer"><div><a className="landing-brand" href="#top"><span className="brand-mark"><ArrowRight /></span><strong>proxyledger</strong></a><p>Every favor, accounted for.</p></div><div className="footer-links"><a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="/dashboard">Dashboard</a><a href="#faq">Privacy</a></div><span className="footer-note">Made for better friendships.</span></footer>
-    </main>
+    </main></MotionConfig>
   )
 }
 

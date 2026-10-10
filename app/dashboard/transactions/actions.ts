@@ -3,12 +3,16 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth-session'
 import { getPrisma } from '@/lib/db'
+import { reportOperationalFailure } from '@/lib/operational-log'
 import { createFavorsService, FavorError } from '@/lib/favors-service'
 import { createFavorInput, changeFavorInput, subjectInput, choiceInput } from '@/lib/favor-types'
 import type { ActionResult } from '@/lib/friend-types'
 import { z } from 'zod'
 
-function failure(error: unknown) { return { ok: false as const, error: error instanceof FavorError ? error.message : 'Unable to complete this action. Please try again.' } }
+function failure(error: unknown) {
+  if (!(error instanceof FavorError)) reportOperationalFailure('favor-action-failed')
+  return { ok: false as const, error: error instanceof FavorError ? error.message : 'Unable to complete this action. Please try again.' }
+}
 export async function recordFavor(input: unknown): Promise<ActionResult<string>> {
   const user = await requireUser()
   const value = createFavorInput.safeParse(input)

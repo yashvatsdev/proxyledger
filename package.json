@@ -2,7 +2,8 @@
   "name": "my-project",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@12.3.4",
+  "packageManager": "pnpm@11.18.0",
+  "engines": { "node": "24.x" },
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/generate-prisma.mjs && next build",
@@ -11,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:browser": "node --conditions=react-server --import tsx scripts/verify-release.ts",
     "db:generate": "node scripts/generate-prisma.mjs",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
@@ -41,6 +43,7 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24",
     "@types/pg": "8.15.6",
@@ -48,6 +51,7 @@
     "@types/react-dom": "^19",
     "eslint": "9.39.2",
     "eslint-config-next": "16.4.0",
+    "playwright": "1.64.0",
     "postcss": "^8.5.29",
     "prisma": "7.10.0",
     "shadcn": "^4.21.4",

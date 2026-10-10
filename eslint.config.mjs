@@ -6,5 +6,5 @@ export default defineConfig([
   ...nextVitals, ...nextTs,
   // Existing landing animations use native anchors. Preserve their current markup.
   { files: ['app/page.tsx', 'app/dashboard/dashboard-client.tsx'], rules: { '@next/next/no-html-link-for-pages': 'off' } },
-  globalIgnores(['.next/**', 'generated/**', '.pnpm-store/**', 'node_modules.phase1-backup/**', 'coverage/**', 'next-env.d.ts']),
+  globalIgnores(['.next/**', 'generated/**', '.pnpm-store/**', 'node_modules.phase1-backup/**', '.phase7-artifacts/**', 'coverage/**', 'next-env.d.ts']),
 ])

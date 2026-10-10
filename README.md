@@ -20,7 +20,9 @@ Prisma generation is also part of installation and build. CLI commands validate 
 
 ## Environment and production
 
-- `DATABASE_URL`: runtime PostgreSQL URL. Use your provider's pooled endpoint in serverless deployments, with TLS enabled. The Prisma PostgreSQL adapter uses a bounded pool of five connections per process and connection/idle timeouts. Account for the total number of application instances when sizing connections.
+Phase 7 launch preparation and approval scope: [deployment runbook](docs/DEPLOYMENT.md), [Phase 7B](docs/PHASE7B.md), [Phase 7C validation](docs/PHASE7C.md), and [launch checklist](docs/LAUNCH_CHECKLIST.md). No production deployment is authorized by these documents.
+
+- `DATABASE_URL`: runtime PostgreSQL URL. Use your provider's pooled endpoint in serverless deployments. Remote runtime connections require certificate-verified TLS. The Prisma PostgreSQL adapter uses one connection per Vercel instance and five locally, with connection/idle timeouts. Account for all application instances when sizing connections.
 - `DIRECT_DATABASE_URL`: optional direct endpoint used by Prisma migrations; falls back to `DATABASE_URL`. Supply it when the runtime URL goes through a transaction pooler.
 
 Keep remote TLS certificate verification enabled. Put production secrets in your deployment's secret store. Generate the client during the build and run `pnpm db:deploy` once in a controlled deployment job with the direct connection. Do not run development migrations or demo seeds in production. Review SQL and take backups before applying migrations.
@@ -49,6 +51,16 @@ pnpm build
 ```
 
 The default test run exercises balances, settlement direction, excluded statuses, cross-subject repayments, and input/environment validation without database writes. Opt-in PostgreSQL suites require a separate disposable database: set `TEST_DATABASE_URL` and `TEST_DATABASE_ISOLATED=1`, apply the existing migrations to that test target, and enable `RUN_FRIENDS_DB_TESTS=1`, `RUN_FAVORS_DB_TESTS=1`, and `RUN_LEDGER_DB_TESTS=1`. They never fall back to the application connection and reject the application/migration database even with different credentials or ports. Distinct host aliases can still reach the same database; operators must verify that the test target is genuinely isolated. Never point it at production. Run `pnpm test --no-file-parallelism --testTimeout=15000 --hookTimeout=20000` for the complete regression run.
+
+## Isolated browser release checks
+
+`pnpm test:browser` runs Chromium and axe against a **separately started local production server**. Install the pinned development dependencies and browser with `pnpm exec playwright install chromium`. Prepare a disposable local PostgreSQL database, including Supabase-compatible `anon` and `authenticated` roles, and apply the five existing migrations only to that test target.
+
+Start the production build on `http://localhost:3108` in a separate terminal with process-local `DATABASE_URL`/`DIRECT_DATABASE_URL` pointing to the disposable database, dummy OAuth settings, a local test `AUTH_SECRET`, `AUTH_URL=http://localhost:3108` and `AUTH_TRUST_HOST=true`. Set `VERCEL=1` to exercise the one-connection runtime pool. Do not edit existing `.env` credentials. The build/start command never applies migrations.
+
+In the browser-test terminal keep the application database environment unchanged, set `TEST_DATABASE_URL` to that disposable database and `TEST_DATABASE_ISOLATED=1`, then run `pnpm test:browser`. `RELEASE_TEST_ORIGIN` optionally selects another localhost HTTP port. Both the fixture database and server origin must be loopback. The script rejects the existing application/migration target and production NODE_ENV, creates UUID-scoped synthetic accounts with real database sessions, exercises actual UI/actions and deletes only its isolated fixtures. No test-auth endpoint exists in the application. It does not contact Google or prove production HTTPS/OAuth behavior.
+
+The full 64-layout/axe report and desktop/mobile screenshots are saved under ignored `.phase7-artifacts/`; these contain synthetic fixture identities only. Do not mix browser and database tests with original records, and do not supply this test environment to Vercel.
 
 ## Phase 2 authentication
 

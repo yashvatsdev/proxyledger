@@ -2,6 +2,9 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
+/* Preserve the palette while making small landing labels readable (WCAG AA). */
+.preview-frame .browser-bar small, .landing-footer .footer-note { color: var(--secondary-text); }
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -38,6 +41,12 @@ html, body { min-height: 100%; }
 body { margin: 0; background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; }
 button, input { font: inherit; }
 button { cursor: pointer; }
+
+/* Keep the public typography unchanged; one variable font for the workspace. */
+.app-shell { font-family: var(--dashboard-font), Arial, Helvetica, sans-serif; }
+.app-shell :is(h1,h2,h3) { font-weight: 600; }
+.app-shell :is(input,select,textarea,button), .circle-dialog :is(input,select,textarea,button) { font-family: inherit; }
+.app-shell :is(time,.ledger-units,.ledger-pair-number,.stat-card strong,.circle-badge,.circle-pagination) { font-variant-numeric: tabular-nums; }
 
 .app-shell { min-height: 100vh; display: flex; background: #0A0D11; }
 .sidebar { width: 244px; flex: 0 0 244px; min-height: 100vh; padding: 28px 16px 18px; border-right: 1px solid var(--border); background: #0D1218; display: flex; flex-direction: column; }
@@ -258,3 +267,30 @@ body:has(.circle-dialog[open]) { overflow:hidden; }
 @media(prefers-reduced-motion:reduce) { .app-shell .nav-active-indicator, .app-shell .button, .circle-dialog .button { transition:none; }.app-shell .button.primary:hover, .circle-dialog .button.primary:hover { transform:none; }.app-shell .circle-skeleton { animation:none; } }
 
 @media (prefers-reduced-motion: reduce) { .hero-actions .button.primary:hover { transform: none; } }
+
+/* Finite SSR fallback: JS/GSAP overrides this before its coordinated entrance.
+   Without hydration the buttons still become usable after 1.8 seconds. */
+.hero-actions { animation: hero-cta-fallback .5s 1.3s both; }
+.hero-actions:focus-within { opacity: 1 !important; transform: none !important; }
+@keyframes hero-cta-fallback { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.button { transition-property: background-color, border-color, color; }
+.nav-item { transition-property: background-color, color; }
+.app-shell .hero-row h1 { font-size: clamp(27px, 3vw, 36px); line-height: 1.18; }
+.app-shell .section-heading { gap: 14px; flex-wrap: wrap; }
+.app-shell .section-heading .text-button { flex-shrink: 0; }
+.app-shell .stat-card { min-height: 128px; }
+.app-shell .circle-empty { padding: 32px 20px; }
+.app-shell .activity-copy strong { white-space: normal; overflow-wrap: anywhere; }
+.app-shell .activity-copy span { overflow-wrap: anywhere; }
+.app-shell .nav-item { font-weight: 500; }
+.app-shell .stat-card > strong { font-weight: 600; letter-spacing: -.035em; }
+@media(max-width: 640px) {
+  .app-shell .stat-card { padding: 14px 12px; min-height: 118px; }
+  .circle-dialog input, .circle-dialog select, .circle-dialog textarea, .app-shell .favor-input { font-size: 16px; }
+  .landing-nav { backdrop-filter: blur(8px); }
+  .ambient-glow { filter: blur(40px); max-width: 100%; }
+}
+@media(prefers-reduced-motion: reduce) {
+  .hero-actions { animation: none; }
+  .landing-shell :is(.story-card,.feature-card,.step-card,.button):hover { transform: none; }
+}
