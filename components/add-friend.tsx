@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
@@ -20,6 +20,7 @@ export default function AddFriend({ label = 'Add Friend', className = 'button pr
   const [message, setMessage] = useState('')
   const [pending, startTransition] = useTransition()
   const generation = useRef(0)
+  const feedbackId = useId()
   const router = useRouter()
   const reduce = useReducedMotion()
   useEffect(() => {
@@ -52,8 +53,8 @@ export default function AddFriend({ label = 'Add Friend', className = 'button pr
   return <>
     <motion.button className={className} onClick={() => { setOpen(true); setMessage('') }} whileHover={reduce ? undefined : { y: -1 }} whileTap={reduce ? undefined : { scale: .98 }}><Plus aria-hidden="true" />{label}</motion.button>
     <CircleDialog open={open} onClose={() => setOpen(false)} title="Grow your circle" description="Search a name prefix (at least 3 characters) or an exact email address.">
-      <label className="circle-search"><Search aria-hidden="true" /><input autoFocus aria-label="Search registered users" placeholder="Name or full email address" maxLength={80} value={query} onChange={(event) => { generation.current++; setQuery(event.target.value); setPage(1); setPeople([]); setHasMore(false); setLoading(false); setMessage('') }} /></label>
-      {message && <p role="status" className="circle-feedback">{message}</p>}
+      <label className="circle-search"><Search aria-hidden="true" /><input autoFocus data-dialog-autofocus aria-label="Search registered users" aria-describedby={feedbackId} placeholder="Name or full email address" maxLength={80} value={query} onChange={(event) => { generation.current++; setQuery(event.target.value); setPage(1); setPeople([]); setHasMore(false); setLoading(false); setMessage('') }} /></label>
+      <p id={feedbackId} role="status" className={message ? 'circle-feedback' : 'sr-only'}>{message || (loading ? 'Searching registered users…' : 'Use at least three characters, or a complete email address.')}</p>
       <div className="search-results" aria-busy={loading}>
         {loading ? Array.from({ length: 3 }, (_, index) => <div className="circle-skeleton" key={index} aria-hidden="true" />) : people.map((person, index) => <motion.div className="circle-search-result" key={person.id} initial={{ opacity: 0, y: reduce ? 0 : 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduce ? 0 : index * .025 }}><UserAvatar user={{ ...person, email: null }} /><strong>{person.name || 'Google user'}</strong>{person.relationship === 'none' ? <button className="button primary" disabled={pending} onClick={() => send(person)}>{pending ? 'Sending…' : 'Invite'}</button> : person.relationship === 'incoming' ? <Link className="text-button" href="/dashboard/friends?tab=incoming" onClick={() => setOpen(false)}>Incoming request</Link> : <span className="circle-badge">{person.relationship === 'accepted' ? 'Already friends' : 'Invitation sent'}</span>}</motion.div>)}
         {!loading && !people.length && <div className="circle-empty"><Search /><h3>{query.trim().length < 3 ? 'Find someone you know' : 'No matching people'}</h3><p>{query.trim().length < 3 ? 'Enter their name or complete email address.' : 'Try their full email, or ask them to sign in with Google first.'}</p>{query && <button className="text-button" onClick={() => { setQuery(''); setPeople([]); setPage(1) }}>Clear search</button>}</div>}

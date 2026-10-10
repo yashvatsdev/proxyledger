@@ -125,12 +125,12 @@ export function createFavorsService(db: PrismaClient) {
     const [count, rows] = await Promise.all([db.favor.count({ where }), db.favor.findMany({ where, select: selection, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: (filter.page - 1) * 20, take: 20 })])
     return { count, rows: rows.map(dto) }
   }
-  async function summary(actor: string) {
+  async function summary(actor: string, includeRecent = true) {
     entityId.parse(actor)
     const [confirmed, pending, awaiting, recent, recentConfirmed] = await Promise.all([
       db.favor.count({ where: { ...involved(actor), status: 'CONFIRMED' } }), db.favor.count({ where: { ...involved(actor), status: 'PENDING' } }),
       db.favor.count({ where: { ...involved(actor), status: 'PENDING', createdById: { not: actor } } }),
-      db.favor.findMany({ where: involved(actor), select: selection, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], take: 3 }),
+      includeRecent ? db.favor.findMany({ where: involved(actor), select: selection, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], take: 3 }) : Promise.resolve([]),
       db.favor.findMany({ where: { ...involved(actor), status: 'CONFIRMED' }, select: selection, orderBy: [{ confirmedAt: 'desc' }, { id: 'asc' }], take: 3 }),
     ])
     return { confirmed, pending, awaiting, recent: recent.map(dto), recentConfirmed: recentConfirmed.map(dto) }

@@ -120,3 +120,7 @@ Favor recording, participant confirmation/rejection, cancellation, private subje
 
 Global balances, audited settlement requests and complete shared ledger history are implemented. See [docs/PHASE5.md](docs/PHASE5.md) for accounting semantics, pair-level concurrency, safe migration, tests and the two-account walkthrough. Balances include confirmed favors across every subject and confirmed settlement adjustments. Positive means the other person owes you; negative means you owe them. Pending/rejected/canceled requests change no balances.
 
+
+## Phase 6
+
+Dashboard integration, private workspace search, supported Google account settings, responsive navigation, dialog/focus improvements and loading/error feedback are implemented. See [docs/PHASE6.md](docs/PHASE6.md) for the audit, 200-test regression results, actual responsive browser checks and remaining Phase 7 tasks. No deployment or schema migration was introduced.

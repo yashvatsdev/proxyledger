@@ -13,7 +13,7 @@ export default async function FriendProfile({params}:{params:Promise<{id:string}
   const actor=await requireUser();const {id}=await params
   if(!id||id.length>128||id===actor.id)notFound()
   const ledger=createLedgerService(getPrisma())
-  const [profile,relationship]=await Promise.all([createFriendsService(getPrisma()).profile(actor.id,id),ledger.pair(actor.id,id)])
+  const [profile,relationship]=await Promise.all([createFriendsService(getPrisma()).profile(actor.id,id,false),ledger.pair(actor.id,id)])
   if(!relationship)notFound()
   const person=profile?.person??{...relationship.person,email:null}
   const history=await ledger.entries(actor.id,id)

@@ -1,3 +1,3 @@
 export default function DashboardLoading() {
-  return <div className="page-content" role="status" aria-label="Loading your workspace"><div className="circle-skeleton" /><div className="circle-skeleton" /><div className="circle-skeleton" /></div>
+  return <div className="page-content dashboard-skeleton" role="status" aria-label="Loading your workspace" aria-busy="true"><span className="sr-only">Loading your workspace…</span><div className="circle-skeleton skeleton-heading" aria-hidden="true" /><div className="stats-grid" aria-hidden="true">{Array.from({ length: 4 }, (_, index) => <div className="circle-skeleton skeleton-card" key={index} />)}</div><div className="dashboard-grid" aria-hidden="true"><div className="circle-skeleton skeleton-panel" /><div className="circle-skeleton skeleton-panel" /></div></div>
 }

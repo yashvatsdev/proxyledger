@@ -51,7 +51,7 @@ export default function RecordFavor({ className = 'button primary' }: { classNam
   return <>
     <motion.button type="button" className={className} onClick={launch} whileHover={{ y: -1 }} whileTap={{ scale: .98 }}><Plus aria-hidden="true" /> Record a favor</motion.button>
     <CircleDialog open={open} onClose={() => { if (!pending) setOpen(false) }} title="Record a favor" description="Both of you acknowledge the same attendance proxy. It counts only after your friend confirms.">
-      <form className="favor-form" onSubmit={event => {
+      <form className="favor-form" aria-busy={pending} aria-describedby={error ? `${formId}-error` : undefined} onSubmit={event => {
         event.preventDefault(); setError('')
         if (!friend || !subject) { setError('Choose an accepted friend and a subject.'); return }
         startTransition(async () => {
@@ -63,7 +63,7 @@ export default function RecordFavor({ className = 'button primary' }: { classNam
         })
       }}>
         <fieldset disabled={pending}><legend>Friend</legend>
-          <label className="sr-only" htmlFor={`${formId}-friend`}>Search accepted friends</label><input id={`${formId}-friend`} className="favor-input" placeholder="Search your accepted friends" maxLength={80} value={friendQuery} onChange={event => { setFriendQuery(event.target.value); setFriendPage(1) }} />
+          <label className="sr-only" htmlFor={`${formId}-friend`}>Search accepted friends</label><input data-dialog-autofocus id={`${formId}-friend`} className="favor-input" aria-describedby={error ? `${formId}-error` : undefined} placeholder="Search your accepted friends" maxLength={80} value={friendQuery} onChange={event => { setFriendQuery(event.target.value); setFriendPage(1) }} />
           {friend && <p className="favor-selected">Selected: {friend.name || 'Your friend'}</p>}
           <div className="favor-choices" aria-busy={loading}>{choices?.ok && choices.data.friends.rows.map(person => <motion.button key={person.id} type="button" className={`favor-choice ${friend?.id === person.id ? 'selected' : ''}`} aria-pressed={friend?.id === person.id} onClick={() => setFriend(person)} whileTap={{ scale: .98 }}><UserAvatar user={{ ...person, email: null }} /><span>{person.name || 'Your friend'}</span>{friend?.id === person.id && <Check aria-hidden="true" />}</motion.button>)}</div>
           {!choices || loading ? <p className="circle-muted" role="status">Loading your choices…</p> : choices.ok && !choices.data.friends.rows.length ? <p className="circle-muted">No accepted friends match. Connect with someone from Friends first.</p> : !choices.ok ? <p role="alert">{choices.error}</p> : null}
@@ -73,7 +73,7 @@ export default function RecordFavor({ className = 'button primary' }: { classNam
           {(['provided', 'received'] as const).map(value => <motion.label key={value} className={direction === value ? 'selected' : ''} whileTap={{ scale: .99 }}><input type="radio" name={`${formId}-direction`} value={value} checked={direction === value} onChange={() => setDirection(value)} />{value === 'provided' ? 'I marked their attendance' : 'They marked my attendance'}</motion.label>)}
         </div><p className="circle-muted">{direction === 'provided' ? `${friend?.name || 'Your friend'} will owe you one proxy after confirmation.` : `You will owe ${friend?.name || 'your friend'} one proxy after confirmation.`}</p></fieldset>
         <fieldset disabled={pending}><legend>Subject</legend>
-          <label className="sr-only" htmlFor={`${formId}-subject`}>Search your subjects</label><input id={`${formId}-subject`} className="favor-input" placeholder="Search your subjects" maxLength={80} value={subjectQuery} onChange={event => { setSubjectQuery(event.target.value); setSubjectPage(1) }} />
+          <label className="sr-only" htmlFor={`${formId}-subject`}>Search your subjects</label><input id={`${formId}-subject`} className="favor-input" aria-describedby={error ? `${formId}-error` : undefined} placeholder="Search your subjects" maxLength={80} value={subjectQuery} onChange={event => { setSubjectQuery(event.target.value); setSubjectPage(1) }} />
           {subject && <p className="favor-selected">Selected: {subject.name}</p>}
           <div className="favor-choices">{choices?.ok && choices.data.subjects.rows.map(item => <button type="button" key={item.id} className={`favor-choice ${subject?.id === item.id ? 'selected' : ''}`} aria-pressed={subject?.id === item.id} onClick={() => setSubject(item)}>{item.name}{subject?.id === item.id && <Check aria-hidden="true" />}</button>)}</div>
           {choices?.ok && !choices.data.subjects.rows.length && <p className="circle-muted">No subjects found. Create one below.</p>}
@@ -84,7 +84,7 @@ export default function RecordFavor({ className = 'button primary' }: { classNam
         </fieldset>
         <label htmlFor={`${formId}-date`}>Attendance date</label><input id={`${formId}-date`} className="favor-input" type="date" required min="1900-01-01" max={todayAttendance()} value={date} disabled={pending} onChange={event => setDate(event.target.value)} />
         <label htmlFor={`${formId}-note`}>Note <span className="circle-muted">(optional, {note.length}/2000)</span></label><textarea id={`${formId}-note`} className="favor-input" rows={3} maxLength={2000} value={note} disabled={pending} onChange={event => setNote(event.target.value)} />
-        {error && <p className="circle-feedback" role="alert">{error}</p>}
+        {error && <p id={`${formId}-error`} className="circle-feedback" role="alert">{error}</p>}
         <motion.button type="submit" className="button primary full-button" disabled={pending || !friend || !subject} whileTap={{ scale: .98 }}>{pending ? 'Saving…' : 'Send for confirmation'}</motion.button>
       </form>
     </CircleDialog>

@@ -11,5 +11,6 @@ export default async function DashboardPage() {
   const [summary, favors, ledger] = await Promise.all([getCircleSummary(user.id), getFavorSummary(user.id), getLedgerOverview(user.id)])
   const circleRows = await createLedgerService(getPrisma()).balancesFor(user.id,summary.preview.map(row=>row.person.id))
   const circleBalances = Object.fromEntries(circleRows.map(row=>[row.person.id,row.balance]))
-  return <DashboardClient actor={user.id} favors={favors} ledger={ledger} circleBalances={circleBalances} user={{ name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} summary={summary} />
+  const publicSummary = { ...summary, preview: summary.preview.map(row => ({ ...row, person: { ...row.person, email: null } })) }
+  return <DashboardClient now={new Date().toISOString()} actor={user.id} favors={favors} ledger={ledger} circleBalances={circleBalances} user={{ name: user.name ?? null, email: user.email ?? null, image: user.image ?? null }} summary={publicSummary} />
 }

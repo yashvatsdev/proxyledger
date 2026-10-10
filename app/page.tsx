@@ -6,7 +6,7 @@ import { useGSAP } from '@gsap/react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowRight, CircleAlert, Clock3, Menu, Minus, Plus, Sparkles, Users, X } from 'lucide-react'
-import { AnimatedButton, AnimatedCard } from '@/components/animations'
+import { AnimatedButton } from '@/components/animations'
 import { createMagneticEffect, easeOut, prefersReducedMotion } from '@/lib/animations'
 
 gsap.registerPlugin(ScrollTrigger)

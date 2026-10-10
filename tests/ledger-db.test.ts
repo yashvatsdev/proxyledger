@@ -8,6 +8,7 @@ import { createFavorsService } from '../lib/favors-service'
 import { createFriendsService } from '../lib/friends-service'
 import { calculateBilateralBalance } from '../lib/ledger'
 import { lockLedgerPair } from '../lib/ledger-lock'
+import { createWorkspaceSearch } from '../lib/search-service'
 
 describe.skipIf(process.env.RUN_LEDGER_DB_TESTS!=='1')('PostgreSQL global ledger and settlement integration',()=>{
   const db=getPrisma(),ledger=createLedgerService(db),settlements=createSettlementsService(db),favors=createFavorsService(db),friends=createFriendsService(db)
@@ -20,7 +21,7 @@ describe.skipIf(process.env.RUN_LEDGER_DB_TESTS!=='1')('PostgreSQL global ledger
     await db.favor.deleteMany({where:{providerId:{in:ids}}})
     await db.subject.deleteMany({where:{ownerId:{in:ids}}})
     await db.friendship.deleteMany({where:{OR:[{requesterId:{in:ids}},{recipientId:{in:ids}}]}})
-    await db.rateLimitBucket.deleteMany({where:{key:{in:ids.flatMap(id=>['settlement-create','settlement-change','favor-create','favor-change','favor-subject','favor-choices','mutation'].map(scope=>`${scope}:${id}`))}}})
+    await db.rateLimitBucket.deleteMany({where:{key:{in:ids.flatMap(id=>['workspace-search','settlement-create','settlement-change','favor-create','favor-change','favor-subject','favor-choices','mutation'].map(scope=>`${scope}:${id}`))}}})
   }
   beforeAll(async()=>{for(const[index,id]of ids.entries())await db.user.create({data:{id,name:`Phase5Test ${index}`,email:`${id}@example.invalid`}})},20000)
   beforeEach(async()=>{
@@ -40,6 +41,41 @@ describe.skipIf(process.env.RUN_LEDGER_DB_TESTS!=='1')('PostgreSQL global ledger
   const input=(overrides:Record<string,unknown>={})=>({friendId:b,amount:2,direction:'owes-me',note:'Agreed reduction',submissionKey:randomUUID(),...overrides})
   async function pendingFavor(provider=a,beneficiary=b,subject=subjectA){return favors.create(provider,{friendId:beneficiary,direction:'provided',subjectId:subject,attendanceDate:'2020-01-01',submissionKey:randomUUID()})}
   async function assertPair(expected:number){expect((await ledger.pair(a,b))?.balance).toBe(expected);expect((await ledger.pair(b,a))?.balance).toBe(expected===0?0:-expected)}
+
+  it('searches only owned subjects, participants’ transactions and visible relationships', async () => {
+    await seed(1,b,a,subjectB)
+    const search=createWorkspaceSearch(db)
+    const physics=await search(a,{query:'Physics'})
+    expect(physics.find(group=>group.label==='Your subjects')?.count).toBe(0)
+    expect(physics.find(group=>group.label==='Transactions')?.count).toBe(1)
+    expect((await search(outsider,{query:'Physics'})).every(group=>group.count===0)).toBe(true)
+    const users=await search(a,{query:'Phase5Test'})
+    expect(users[0].items.map(item=>item.id).sort()).toEqual([b,c].sort())
+    expect(JSON.stringify(users)).not.toContain('@example.invalid')
+    expect(JSON.stringify(users)).not.toContain(outsider)
+    await db.subject.create({data:{ownerId:outsider,name:'PrivateSubjectNeedle'}})
+    expect((await search(a,{query:'PrivateSubjectNeedle'})).every(group=>group.count===0)).toBe(true)
+  },15000)
+  it('bounds search previews while retaining counts and literal wildcard semantics', async () => {
+    await db.subject.createMany({data:Array.from({length:7},(_,index)=>({ownerId:a,name:`BoundedNeedle ${index}`}))})
+    const search=createWorkspaceSearch(db)
+    const subjects=(await search(a,{query:'BoundedNeedle'}))[1]
+    expect(subjects.count).toBe(7);expect(subjects.items).toHaveLength(4)
+    expect(subjects.href).toBe('/dashboard/subjects?q=BoundedNeedle')
+    expect((await search(a,{query:'%_'})).every(group=>group.count===0)).toBe(true)
+  })
+  it('keeps shared historical ledgers searchable after removal without revealing unrelated users', async () => {
+    await seed(1)
+    await friends.change(a,'remove',connection)
+    const results=await createWorkspaceSearch(db)(a,{query:'Phase5Test 1'})
+    expect(results[0].items.map(item=>item.id)).toEqual([b])
+    expect(results[0].items[0].href).toBe(`/dashboard/balances/${b}`)
+  })
+  it('enforces persisted per-user search limits without blocking another user', async () => {
+    await db.rateLimitBucket.create({data:{key:`workspace-search:${a}`,count:60,expiresAt:new Date(Date.now()+60000)}})
+    await expect(createWorkspaceSearch(db)(a,{query:'Math'})).rejects.toThrow('Too many searches')
+    expect((await createWorkspaceSearch(db)(b,{query:'Physics'}))[1].count).toBe(1)
+  })
 
   it('returns zero for accepted friends with no favors and hides unrelated profiles',async()=>{
     await assertPair(0)

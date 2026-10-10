@@ -20,6 +20,7 @@ coverage/
 .phase4-before.prisma
 .phase5-before.prisma
 .phase5-baseline.json
+.phase6-artifacts/
 
 # Common ignores
 node_modules

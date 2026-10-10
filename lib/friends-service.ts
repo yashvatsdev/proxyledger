@@ -116,11 +116,11 @@ export function createFriendsService(db: PrismaClient) {
     return { accepted, incoming, outgoing, unread, preview: preview.map((row) => ({ id: row.id, person: row.requesterId === actor ? row.recipient : row.requester, status: row.status, connectedAt: row.connectedAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString() })) }
   }
 
-  async function profile(actor: string, target: string) {
+  async function profile(actor: string, target: string, includeActivity = true) {
     entityId.parse(target)
     const friendship = await db.friendship.findFirst({ where: { ...pair(actor, target), status: 'ACCEPTED' }, include: { requester: { select: contactProfile }, recipient: { select: contactProfile } } })
     if (!friendship) return null
-    const activity = await db.favor.findMany({ where: { status: 'CONFIRMED', OR: [{ providerId: actor, beneficiaryId: target }, { providerId: target, beneficiaryId: actor }] }, select: { id: true, providerId: true, occurredAt: true, subject: { select: { name: true } } }, orderBy: { occurredAt: 'desc' }, take: 10 })
+    const activity = includeActivity ? await db.favor.findMany({ where: { status: 'CONFIRMED', OR: [{ providerId: actor, beneficiaryId: target }, { providerId: target, beneficiaryId: actor }] }, select: { id: true, providerId: true, occurredAt: true, subject: { select: { name: true } } }, orderBy: { occurredAt: 'desc' }, take: 10 }) : []
     return { person: friendship.requesterId === actor ? friendship.recipient : friendship.requester, status: friendship.status, connectedAt: friendship.connectedAt?.toISOString() ?? null, activity: activity.map((row) => ({ id: row.id, description: row.providerId === actor ? 'You provided a favor' : 'Your friend provided a favor', subject: row.subject?.name ?? null, occurredAt: row.occurredAt.toISOString() })) }
   }
 

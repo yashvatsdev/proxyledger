@@ -20,10 +20,17 @@ import BalancesPage from '../app/dashboard/balances/page'
 import FriendLedger from '../app/dashboard/balances/[friendId]/page'
 import SettlementsPage from '../app/dashboard/settlements/page'
 import SettlementDetails from '../app/dashboard/settlements/[id]/page'
+import SettingsPage from '../app/dashboard/settings/page'
 
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.redirect.mockImplementation(() => { throw new Error('redirect') })
+})
+
+it('authorizes account settings before displaying profile information', async () => {
+  mocks.requireUser.mockRejectedValue(new Error('unauthorized'))
+  await expect(SettingsPage()).rejects.toThrow('unauthorized')
+  expect(mocks.requireUser).toHaveBeenCalledOnce()
 })
 
 it('redirects an authenticated visitor away from login', async () => {
