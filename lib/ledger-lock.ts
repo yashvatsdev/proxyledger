@@ -1,3 +1,4 @@
+import 'server-only'
 import type { Prisma } from '@/generated/prisma/client'
 
 /** Acquire before reading the balance or changing a confirmed ledger event.

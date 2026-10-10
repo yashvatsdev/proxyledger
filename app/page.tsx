@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { motion, useScroll, useTransform } from 'motion/react'
+import { useRef, useState, type MouseEvent } from 'react'
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { useGSAP } from '@gsap/react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -39,6 +39,7 @@ export default function LandingPage() {
   const [balance, setBalance] = useState(0)
   const pageRef = useRef<HTMLElement>(null)
   const { scrollY } = useScroll()
+  const reduceHeroMotion = useReducedMotion()
 
   useGSAP(() => {
     if (prefersReducedMotion()) return
@@ -48,7 +49,7 @@ export default function LandingPage() {
         .from('.eyebrow-badge', { opacity: 0, y: 18, duration: 0.45 }, '-=0.2')
         .from('.hero-content h1', { opacity: 0, y: 32, duration: 0.7 }, '-=0.16')
         .from('.hero-content > p', { opacity: 0, y: 18, duration: 0.5 }, '-=0.35')
-        .from('.hero-actions > *', { opacity: 0, y: 16, stagger: 0.1, duration: 0.4 }, '-=0.22')
+        .from('.hero-actions', { y: 8, duration: 0.5, immediateRender: false, clearProps: 'transform' }, '-=0.22')
         .from('.preview-frame', { opacity: 0, y: 70, scale: 0.94, rotateX: 5, duration: 0.85 }, '-=0.08')
       gsap.utils.toArray<HTMLElement>('.gsap-reveal').forEach((element) => {
         gsap.from(element, { opacity: 0, y: 28, duration: 0.65, ease: easeOut, scrollTrigger: { trigger: element, start: 'top 84%', once: true } })
@@ -68,6 +69,15 @@ export default function LandingPage() {
   const updateBalance = (delta: number) => setBalance((current) => current + delta)
   const balanceLabel = balance === 0 ? 'You and Rahul are all settled.' : balance < 0 ? 'You owe Rahul.' : 'Rahul owes you.'
 
+  function scrollToHowItWorks(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    const section = document.getElementById('how-it-works')
+    if (!section) return
+    event.preventDefault()
+    window.history.pushState(null, '', '#how-it-works')
+    section.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' })
+  }
+
   return (
     <main ref={pageRef} className="landing-shell">
       <motion.header className="landing-nav" style={{ backgroundColor: `rgba(10, 13, 17, ${navOpacity})` }}>
@@ -85,7 +95,10 @@ export default function LandingPage() {
           <div className="eyebrow-badge"><Sparkles /> YOUR CIRCLE. YOUR BALANCE.</div>
           <h1>Good friends.<br /><span>Clear balances.</span></h1>
           <p>Track every favor, settle every balance, and keep your friendships free from awkward reminders.</p>
-          <div className="hero-actions"><AnimatedButton className="button primary large" href="/dashboard">Start tracking <ArrowRight /></AnimatedButton><AnimatedButton className="button outline large" href="#how-it-works">See how it works</AnimatedButton></div>
+          <div className="hero-actions">
+            <AnimatedButton className="button primary large" href="/dashboard" whileHover={reduceHeroMotion ? undefined : { scale: 1.02 }} whileTap={reduceHeroMotion ? undefined : { scale: 0.97 }}>Start tracking <ArrowRight aria-hidden="true" /></AnimatedButton>
+            <AnimatedButton className="button outline large" href="#how-it-works" onClick={scrollToHowItWorks} whileHover={reduceHeroMotion ? undefined : { scale: 1.02 }} whileTap={reduceHeroMotion ? undefined : { scale: 0.97 }}>See how it works</AnimatedButton>
+          </div>
         </div>
         <DashboardPreview />
       </section>

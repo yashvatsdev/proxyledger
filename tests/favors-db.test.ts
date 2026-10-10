@@ -1,13 +1,13 @@
 import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { getPrisma } from '../lib/db'
+import { getTestPrisma } from './helpers/test-database'
 import { createFavorsService } from '../lib/favors-service'
 import { createFriendsService } from '../lib/friends-service'
 import { calculateBilateralBalance } from '../lib/ledger'
 
 describe.skipIf(process.env.RUN_FAVORS_DB_TESTS !== '1')('PostgreSQL favor integration', () => {
-  const db = getPrisma()
+  const db = getTestPrisma(process.env.RUN_FAVORS_DB_TESTS === '1')
   const service = createFavorsService(db)
   const friends = createFriendsService(db)
   const ids = [randomUUID(), randomUUID(), randomUUID()]

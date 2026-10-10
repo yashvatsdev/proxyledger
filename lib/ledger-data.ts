@@ -1,3 +1,4 @@
+import 'server-only'
 import { cache } from 'react'
 import { getPrisma } from './db'
 import { createLedgerService } from './ledger-service'

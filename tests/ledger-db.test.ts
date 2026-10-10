@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
-import { afterAll,beforeAll,beforeEach,describe,expect,it } from 'vitest'
-import { getPrisma } from '../lib/db'
+import { afterAll,beforeAll,beforeEach,describe,expect,it,vi } from 'vitest'
+import { getTestPrisma } from './helpers/test-database'
 import { createLedgerService } from '../lib/ledger-service'
 import { createSettlementsService } from '../lib/settlements-service'
 import { createFavorsService } from '../lib/favors-service'
@@ -9,11 +9,27 @@ import { createFriendsService } from '../lib/friends-service'
 import { calculateBilateralBalance } from '../lib/ledger'
 import { lockLedgerPair } from '../lib/ledger-lock'
 import { createWorkspaceSearch } from '../lib/search-service'
+import { consumeRateLimit } from '../lib/rate-limit'
 
 describe.skipIf(process.env.RUN_LEDGER_DB_TESTS!=='1')('PostgreSQL global ledger and settlement integration',()=>{
-  const db=getPrisma(),ledger=createLedgerService(db),settlements=createSettlementsService(db),favors=createFavorsService(db),friends=createFriendsService(db)
+  const db=getTestPrisma(process.env.RUN_LEDGER_DB_TESTS==='1'),ledger=createLedgerService(db),settlements=createSettlementsService(db),favors=createFavorsService(db),friends=createFriendsService(db)
   const ids=[randomUUID(),randomUUID(),randomUUID(),randomUUID()]
   const [a,b,c,outsider]=ids
+  it('shares a strict atomic rate limit across concurrent service instances', async () => {
+    const results = await Promise.all(Array.from({ length: 8 }, () => consumeRateLimit(db, a, 'workspace-search', 4, 60000)))
+    expect(results.filter(Boolean)).toHaveLength(4)
+    expect((await db.rateLimitBucket.findUniqueOrThrow({ where: { key: `workspace-search:${a}` } })).count).toBe(5)
+    expect(await consumeRateLimit(db, b, 'workspace-search', 4, 60000)).toBe(true)
+  })
+  it('uses the database clock for rate-limit windows despite an application clock mismatch', async () => {
+    const [{ now }] = await db.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0)
+    try { expect(await consumeRateLimit(db, a, 'workspace-search', 4, 60000)).toBe(true) } finally { clock.mockRestore() }
+    const bucket = await db.rateLimitBucket.findUniqueOrThrow({ where: { key: `workspace-search:${a}` } })
+    expect(bucket.expiresAt.getTime()).toBeGreaterThanOrEqual(now.getTime() + 59000)
+    expect(bucket.expiresAt.getTime()).toBeLessThan(now.getTime() + 70000)
+    expect(await consumeRateLimit(db, a, 'workspace-search', 4, 60000)).toBe(true)
+  })
   let subjectA:string,subjectB:string,connection:string
   async function clear(){
     await db.notification.deleteMany({where:{userId:{in:ids}}})

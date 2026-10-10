@@ -1,3 +1,4 @@
+import 'server-only'
 import type { Prisma, PrismaClient } from '@/generated/prisma/client'
 import { createFavorInput, changeFavorInput, subjectInput, favorFilters, choiceInput, type FavorRecord } from './favor-types'
 import { entityId } from './friend-types'

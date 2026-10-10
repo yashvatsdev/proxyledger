@@ -58,6 +58,29 @@ it('requires CSRF validation for sign-out POSTs', async () => {
   expect(response.headers.get('location')).toContain('MissingCSRF')
 })
 
+it('rejects a forged CSRF token even when the attacker supplies a real CSRF cookie', async () => {
+  const csrfResponse = await handlers.GET(request('csrf'))
+  const cookies = csrfResponse.headers.getSetCookie().map(cookie => cookie.split(';')[0]).join('; ')
+  const response = await handlers.POST(new NextRequest(`${origin}/api/auth/signout`, {
+    method: 'POST', headers: { cookie: `${sessionCookie}; ${cookies}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ csrfToken: 'forged-token', callbackUrl: '/' }),
+  }))
+  expect(db.session.delete).not.toHaveBeenCalled()
+  expect(response.headers.get('location')).toContain('MissingCSRF')
+})
+
+it('does not accept a client-supplied identity when updating an authenticated session', async () => {
+  db.session.findUnique.mockResolvedValue({ user, userId: user.id, sessionToken: token, expires: new Date(Date.now() + 30 * 86400000) })
+  const csrfResponse = await handlers.GET(request('csrf'))
+  const { csrfToken } = await csrfResponse.json()
+  const cookies = csrfResponse.headers.getSetCookie().map(cookie => cookie.split(';')[0]).join('; ')
+  const response = await handlers.POST(new NextRequest(`${origin}/api/auth/session`, {
+    method: 'POST', headers: { cookie: `${sessionCookie}; ${cookies}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ csrfToken, data: { user: { id: 'forged-user', email: 'outsider@example.com' }, sessionToken: 'forged-session' } }),
+  }))
+  expect((await response.json()).user).toEqual({ id: user.id, name: user.name, email: user.email, image: user.image })
+})
+
 it('deletes the session, clears the secure cookie and redirects home after a CSRF-validated sign-out', async () => {
   const csrfResponse = await handlers.GET(request('csrf'))
   const { csrfToken } = await csrfResponse.json()

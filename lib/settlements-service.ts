@@ -1,3 +1,4 @@
+import 'server-only'
 import type { Prisma, PrismaClient } from '@/generated/prisma/client'
 import { entityId } from './friend-types'
 import { proposeSettlementInput, resolveSettlementInput, settlementFilters, type SettlementRecord } from './settlement-types'

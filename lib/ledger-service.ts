@@ -1,3 +1,4 @@
+import 'server-only'
 import { Prisma, type PrismaClient } from '@/generated/prisma/client'
 import { entityId } from './friend-types'
 import { calculateBilateralBalance, type LedgerFavor, type LedgerSettlement } from './ledger'

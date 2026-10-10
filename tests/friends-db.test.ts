@@ -1,12 +1,12 @@
 import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { getPrisma } from '../lib/db'
+import { getTestPrisma } from './helpers/test-database'
 import { createFriendsService } from '../lib/friends-service'
 
 // Explicit opt-in. Fixtures are isolated by freshly generated IDs and cleaned up.
 describe.skipIf(process.env.RUN_FRIENDS_DB_TESTS !== '1')('PostgreSQL friendship integration', () => {
-  const db = getPrisma()
+  const db = getTestPrisma(process.env.RUN_FRIENDS_DB_TESTS === '1')
   const service = createFriendsService(db)
   const marker = `Phase3Test${randomUUID().replaceAll('-', '')}`
   const ids = [randomUUID(), randomUUID(), randomUUID()]

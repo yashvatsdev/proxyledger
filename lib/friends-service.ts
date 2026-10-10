@@ -1,3 +1,4 @@
+import 'server-only'
 import type { PrismaClient, Prisma } from '@/generated/prisma/client'
 import { entityId, searchInput, type FriendOperation, type FriendTab } from './friend-types'
 import { dbErrorCode as code } from './db-errors'
