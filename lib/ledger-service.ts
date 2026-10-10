@@ -92,13 +92,35 @@ export function createLedgerService(db: PrismaClient) {
     ], { isolationLevel: 'RepeatableRead' })
     return { count: integer(counts[0].count), rows: rows.map(row=>eventDto(actor,row)) }
   }
-  async function overview(actor: string) {
-    // These reads share a single serverless connection. Do not queue two
-    // snapshot transactions behind the totals query within the same request.
-    const summary = await totals(actor)
-    const preview = await list(actor,{ sort:'recent' })
-    const recent = await entries(actor)
-    return { summary, preview: preview.rows.slice(0,4), recent: recent.rows.slice(0,5) }
+  async function overview(actor: string, circleIds: string[] = []) {
+    entityId.parse(actor)
+    if (circleIds.length > 20) throw new Error('Too many profiles requested')
+    circleIds.forEach(id => entityId.parse(id))
+    // A single PostgreSQL statement has one consistent snapshot. Reuse the
+    // actor-scoped aggregation and avoid count/page transactions for previews.
+    type JsonBalance = Omit<BalanceRow,'lastActive'> & { lastActive: string | null }
+    type JsonEvent = Omit<EventRow,'occurredAt'|'effectiveAt'|'createdAt'> & { occurredAt:string|null;effectiveAt:string;createdAt:string }
+    const [row] = await db.$queryRaw<{ summary: BalanceTotals; preview: JsonBalance[]; recent: JsonEvent[]; circle: JsonBalance[] }[]>(Prisma.sql`${balancesSql(actor)},
+      running AS (SELECT *,sum(delta) OVER(PARTITION BY "friendId" ORDER BY "effectiveAt", "eventKey" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)::bigint AS running FROM events),
+      recent AS (SELECT r.*,u.name,u.image,s.name AS subject,st."signedAmount" FROM running r JOIN "User" u ON u.id=r."friendId" LEFT JOIN "Subject" s ON s.id=r."subjectId" LEFT JOIN "Settlement" st ON r.kind='settlement' AND st.id=r."entryId" ORDER BY r."effectiveAt" DESC,r."eventKey" DESC LIMIT 5),
+      preview AS (SELECT * FROM profiles ORDER BY "lastActive" DESC NULLS LAST,lower(name) ASC NULLS LAST,"friendId" ASC LIMIT 4)
+      SELECT (SELECT jsonb_build_object(
+        'owedToMe',coalesce(sum(balance) FILTER(WHERE balance>0),0),
+        'iOwe',coalesce(sum(-balance) FILTER(WHERE balance<0),0),
+        'owesMeCount',count(*) FILTER(WHERE balance>0),'iOweCount',count(*) FILTER(WHERE balance<0),
+        'settledCount',count(*) FILTER(WHERE balance=0),'outstandingCount',count(*) FILTER(WHERE balance<>0),
+        'relationshipCount',count(*),'pendingSettlements',coalesce(sum("pendingSettlements"),0),
+        'incomingSettlements',coalesce(sum("incomingSettlements"),0)) FROM profiles) AS summary,
+      (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p."lastActive" DESC NULLS LAST,lower(p.name) ASC NULLS LAST,p."friendId" ASC),'[]'::jsonb) FROM preview p) AS preview,
+      (SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r."effectiveAt" DESC,r."eventKey" DESC),'[]'::jsonb) FROM recent r) AS recent,
+      (SELECT coalesce(jsonb_agg(to_jsonb(p)),'[]'::jsonb) FROM profiles p WHERE ${circleIds.length ? Prisma.sql`p."friendId" IN (${Prisma.join(circleIds)})` : Prisma.sql`false`}) AS circle`)
+    const hydrateBalance = (value: JsonBalance) => card({ ...value,lastActive:value.lastActive ? new Date(value.lastActive) : null })
+    return {
+      summary: Object.fromEntries(Object.entries(row.summary).map(([key,value])=>[key,integer(value)])) as BalanceTotals,
+      preview: row.preview.map(hydrateBalance),
+      recent: row.recent.map(value=>eventDto(actor,{...value,occurredAt:value.occurredAt ? new Date(value.occurredAt) : null,effectiveAt:new Date(value.effectiveAt),createdAt:new Date(value.createdAt)})),
+      circleBalances: Object.fromEntries(row.circle.map(value=>[value.friendId,integer(value.balance)])),
+    }
   }
   return { pair, balancesFor, list, totals, entries, overview }
 }

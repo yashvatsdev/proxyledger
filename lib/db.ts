@@ -1,5 +1,5 @@
 import 'server-only'
-import { PrismaPg } from '@prisma/adapter-pg'
+import { TimedPool, TimedPrismaPg } from './timed-database-adapter'
 import { PrismaClient } from '@/generated/prisma/client'
 import { getDatabaseEnv } from './env'
 import { databasePoolConfig, databaseTransactionOptions } from './database-pool-config'
@@ -13,7 +13,10 @@ export function getPrisma(): PrismaClient {
     const { DATABASE_URL } = getDatabaseEnv()
     globalForPrisma.prisma = new PrismaClient({
       transactionOptions: databaseTransactionOptions,
-      adapter: new PrismaPg(databasePoolConfig(DATABASE_URL), {
+      // Adapter and application resolve different @types/pg versions; both
+      // use the same supported pg Pool runtime interface.
+      adapter: new TimedPrismaPg(new TimedPool(databasePoolConfig(DATABASE_URL)) as unknown as ConstructorParameters<typeof TimedPrismaPg>[0], {
+        disposeExternalPool: true,
         onPoolError: () => reportOperationalFailure('database-connection-failed'),
         onConnectionError: () => reportOperationalFailure('database-connection-failed'),
       }),

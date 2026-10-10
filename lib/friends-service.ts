@@ -1,5 +1,5 @@
 import 'server-only'
-import type { PrismaClient, Prisma } from '@/generated/prisma/client'
+import { Prisma, type PrismaClient } from '@/generated/prisma/client'
 import { entityId, searchInput, type FriendOperation, type FriendTab } from './friend-types'
 import { dbErrorCode as code } from './db-errors'
 import { consumeRateLimit } from './rate-limit'
@@ -106,15 +106,19 @@ export function createFriendsService(db: PrismaClient) {
     }) }
   }
 
-  async function summary(actor: string) {
-    const [accepted, incoming, outgoing, unread, preview] = await Promise.all([
-      db.friendship.count({ where: { ...participant(actor), status: 'ACCEPTED' } }),
-      db.friendship.count({ where: { recipientId: actor, status: 'PENDING' } }),
-      db.friendship.count({ where: { requesterId: actor, status: 'PENDING' } }),
-      db.notification.count({ where: { userId: actor, readAt: null } }),
+  async function summary(actor: string, cachedUnread?: number) {
+    entityId.parse(actor)
+    const [counts, unread, preview] = await Promise.all([
+      db.$queryRaw<{accepted:bigint;incoming:bigint;outgoing:bigint}[]>(Prisma.sql`SELECT
+        count(*) FILTER(WHERE status='ACCEPTED') AS accepted,
+        count(*) FILTER(WHERE status='PENDING' AND "recipientId"=${actor}) AS incoming,
+        count(*) FILTER(WHERE status='PENDING' AND "requesterId"=${actor}) AS outgoing
+        FROM "Friendship" WHERE ("requesterId"=${actor} OR "recipientId"=${actor}) AND status IN ('ACCEPTED','PENDING')`),
+      cachedUnread === undefined ? db.notification.count({ where: { userId: actor, readAt: null } }) : Promise.resolve(cachedUnread),
       db.friendship.findMany({ where: { ...participant(actor), status: 'ACCEPTED' }, take: 4, orderBy: { connectedAt: 'desc' }, include: { requester: { select: contactProfile }, recipient: { select: contactProfile } } }),
     ])
-    return { accepted, incoming, outgoing, unread, preview: preview.map((row) => ({ id: row.id, person: row.requesterId === actor ? row.recipient : row.requester, status: row.status, connectedAt: row.connectedAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString() })) }
+    const numbers=Object.fromEntries(Object.entries(counts[0]).map(([key,value])=>{const count=Number(value);if(!Number.isSafeInteger(count))throw new Error('Circle count exceeds safe integer range');return [key,count]})) as {accepted:number;incoming:number;outgoing:number}
+    return { ...numbers, unread, preview: preview.map((row) => ({ id: row.id, person: row.requesterId === actor ? row.recipient : row.requester, status: row.status, connectedAt: row.connectedAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString() })) }
   }
 
   async function profile(actor: string, target: string, includeActivity = true) {

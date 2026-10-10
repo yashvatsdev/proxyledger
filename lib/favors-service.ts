@@ -1,5 +1,5 @@
 import 'server-only'
-import type { Prisma, PrismaClient } from '@/generated/prisma/client'
+import { Prisma, type PrismaClient } from '@/generated/prisma/client'
 import { createFavorInput, changeFavorInput, subjectInput, favorFilters, choiceInput, type FavorRecord } from './favor-types'
 import { entityId } from './friend-types'
 import { favorInputSchema } from './ledger'
@@ -128,13 +128,17 @@ export function createFavorsService(db: PrismaClient) {
   }
   async function summary(actor: string, includeRecent = true) {
     entityId.parse(actor)
-    const [confirmed, pending, awaiting, recent, recentConfirmed] = await Promise.all([
-      db.favor.count({ where: { ...involved(actor), status: 'CONFIRMED' } }), db.favor.count({ where: { ...involved(actor), status: 'PENDING' } }),
-      db.favor.count({ where: { ...involved(actor), status: 'PENDING', createdById: { not: actor } } }),
+    const [counts, recent, recentConfirmed] = await Promise.all([
+      db.$queryRaw<{confirmed:bigint;pending:bigint;awaiting:bigint}[]>(Prisma.sql`SELECT
+        count(*) FILTER(WHERE status='CONFIRMED') AS confirmed,
+        count(*) FILTER(WHERE status='PENDING') AS pending,
+        count(*) FILTER(WHERE status='PENDING' AND "createdById"<>${actor}) AS awaiting
+        FROM "Favor" WHERE ("providerId"=${actor} OR "beneficiaryId"=${actor}) AND status IN ('CONFIRMED','PENDING')`),
       includeRecent ? db.favor.findMany({ where: involved(actor), select: selection, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], take: 3 }) : Promise.resolve([]),
       db.favor.findMany({ where: { ...involved(actor), status: 'CONFIRMED' }, select: selection, orderBy: [{ confirmedAt: 'desc' }, { id: 'asc' }], take: 3 }),
     ])
-    return { confirmed, pending, awaiting, recent: recent.map(dto), recentConfirmed: recentConfirmed.map(dto) }
+    const numbers=Object.fromEntries(Object.entries(counts[0]).map(([key,value])=>{const count=Number(value);if(!Number.isSafeInteger(count))throw new Error('Favor count exceeds safe integer range');return [key,count]})) as {confirmed:number;pending:number;awaiting:number}
+    return { ...numbers, recent: recent.map(dto), recentConfirmed: recentConfirmed.map(dto) }
   }
   return { create, change, createSubject, subjects, friends, historyChoices, detail, list, summary, rateLimit }
 }
