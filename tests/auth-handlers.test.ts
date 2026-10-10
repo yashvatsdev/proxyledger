@@ -20,6 +20,17 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllEnvs())
 
+it('diagnoses a database adapter failure while keeping the session response sanitized', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    db.session.findUnique.mockRejectedValue(Object.assign(new Error('private-token user@example.invalid'), { code: 'P1011' }))
+    expect(await (await handlers.GET(request('session', sessionCookie))).json()).toBeNull()
+    expect(log.mock.calls.some(call => (call[1] as { operation?: string })?.operation === 'getSessionAndUser')).toBe(true)
+    expect(JSON.stringify(log.mock.calls)).not.toContain('private-token')
+    expect(JSON.stringify(log.mock.calls)).not.toContain('user@example.invalid')
+  } finally { log.mockRestore() }
+})
+
 function request(path: string, cookie = '') {
   return new NextRequest(`${origin}/api/auth/${path}`, { headers: { cookie } })
 }

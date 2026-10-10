@@ -8,6 +8,7 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 
 # Environment variables
+certificates/
 .env*.local
 .env
 .env.*

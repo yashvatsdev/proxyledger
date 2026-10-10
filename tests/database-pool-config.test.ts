@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { databasePoolConfig } from '../lib/database-pool-config'
+import { rootCertificates } from 'node:tls'
+import { Client } from 'pg'
 
 describe('runtime PostgreSQL pool policy', () => {
+  it('preserves an explicit CA through the actual pg connection-string parser', () => {
+    const ca = rootCertificates[0]
+    const config = databasePoolConfig('postgresql://test:test@pool.example.invalid:6543/postgres?sslmode=require', true, ca)
+    const client = new Client(config) as unknown as { connectionParameters: { ssl: unknown } }
+    expect(client.connectionParameters.ssl).toEqual({ rejectUnauthorized: true, ca })
+    expect(new URL(config.connectionString).searchParams.has('sslmode')).toBe(false)
+  })
+  it('accepts escaped PEM newlines without exposing invalid certificate values', () => {
+    expect(databasePoolConfig('postgresql://test:test@pool.example.invalid/postgres', true, rootCertificates[0].replace(/\n/g, '\\n')).ssl?.ca).toBe(rootCertificates[0].trim())
+    expect(() => databasePoolConfig('postgresql://test:secret@pool.example.invalid/postgres', true, 'private-secret')).toThrow('Invalid database CA certificate')
+    expect(() => databasePoolConfig('postgresql://test:test@pool.example.invalid/postgres?sslrootcert=private', true, rootCertificates[0])).toThrow('Invalid or conflicting database CA configuration')
+  })
   it('requires verified TLS for a remote URL without SSL options', () => {
     const config = databasePoolConfig('postgresql://test:test@pool.example.invalid:6543/postgres', true)
     expect(new URL(config.connectionString!).searchParams.get('sslmode')).toBe('verify-full')

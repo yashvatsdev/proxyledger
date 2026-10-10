@@ -4,10 +4,16 @@ import Google from 'next-auth/providers/google'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { getPrisma } from '@/lib/db'
 import { safeAuthRedirect } from '@/lib/auth-utils'
+import { authLogger, diagnosticAdapter, reportAuthFailure } from '@/lib/auth-diagnostics'
+
+function getAuthAdapter() {
+  try { return diagnosticAdapter(PrismaAdapter(getPrisma())) }
+  catch (error) { reportAuthFailure(error, 'configuration'); throw error }
+}
 
 // Lazy initialization keeps secret/database configuration out of static builds.
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
-  adapter: PrismaAdapter(getPrisma()),
+  adapter: getAuthAdapter(),
   providers: [Google],
   session: { strategy: 'database', maxAge: 30 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
   pages: { signIn: '/login', error: '/login' },
@@ -22,9 +28,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
     },
   },
   // Never log OAuth payloads, provider tokens, database URLs, or user details.
-  logger: {
-    error() { console.error('[auth] Authentication request failed') },
-    warn() { console.warn('[auth] Authentication configuration warning') },
-    debug() {},
-  },
+  logger: authLogger,
 }))
